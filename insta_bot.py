@@ -20,7 +20,7 @@ username.send_keys('roger_nogueira')
 password.send_keys(PASSWORD)
 password.send_keys(Keys.RETURN)
 time.sleep(5)
-driver.get('https://www.instagram.com/illuminainc/')
+driver.get('https://www.instagram.com/ppggtd_uft/')
 time.sleep(2)
 #postsposts_elements = driver.find_elements(By.CLASS_NAME, '_aagw')
 posts_elements = driver.find_elements(By.XPATH, '//a[contains(@href, "/p/") or contains(@href, "/reel/")]')
@@ -34,16 +34,16 @@ while True:
 
     if len(new_posts) == len(posts_elements):
         break
-    if len(posts_elements) >= 20:
+    if len(posts_elements) >= 10:
         break
     posts_elements = new_posts
-    posts_urls = [post.get_attribute('href') for post in posts_elements]
-    
+ 
+posts_urls = [post.get_attribute('href') for post in posts_elements]    
 posts = posts_elements
 dict_posts = []
-for post in posts_urls:
-    #post.click()
-    driver.get(post)
+for post in posts:
+    post.click()
+    #driver.get(post)
     time.sleep(3)
     ele_comentarios = driver.find_elements(By.CLASS_NAME, '_a9zo')
     if len(ele_comentarios) > 1:
@@ -57,11 +57,11 @@ for post in posts_urls:
     else:
         comentarios = []
     dict_posts.append({
-        'url':post, 
+        'url':post.get_attribute('href'), 
         'comentarios': comentarios
     })
-    #close = driver.find_element(By.CLASS_NAME,'x160vmok')
-    #close.click()
+    close = driver.find_element(By.CLASS_NAME,'x160vmok')
+    close.click()
     time.sleep(2)
 
 
