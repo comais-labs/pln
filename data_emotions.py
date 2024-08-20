@@ -69,7 +69,6 @@ emojis_para_palavras = {
     "☺": " feliz ",
     "✈" : " viagem ",	
     "🎁" : " presente ",
-    
     "😁" : "sorrindo",
     "🛋" : " casa ",
     "💡" : " ideia " ,
@@ -120,6 +119,7 @@ emojis_para_palavras = {
 
 data = {
     'comentario': [        
+        # Alegria
         "Estou tão feliz por finalmente conseguir esse emprego! 😊👏👏👏",
         "Que dia maravilhoso! Tudo está dando certo. 🌞👏",
         "Não consigo parar de sorrir, essa notícia é incrível! 😄👏",
@@ -432,8 +432,11 @@ data = {
         "Estou horrorizado com a falta de higiene, é insuportável. 🤮",
         "Esse cheiro está tão ruim que estou prestes a vomitar. 🤢",
         "so de olhar para isso ja me sinto mal",
+        "so de olhar para isso ja me enojado",
+        "enojado",
+        "Credo me deixou ja me enojado",
     ],
-    'emocao':[ 'alegria'] * 50 + ['tristeza'] * 50 +  ['raiva'] * 50 +  ['medo'] * 50 +   ['surpresa'] * 50 +   ['nojo'] * 50
+    'emocao':[ 'alegria'] * 50 + ['tristeza'] * 50 +  ['raiva'] * 50 +  ['medo'] * 50 +   ['surpresa'] * 50 +   ['nojo'] * 53
 }
 
 
