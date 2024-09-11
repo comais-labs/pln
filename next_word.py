@@ -5,9 +5,11 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 
-# Configurações básicas
+#
+#  Configurações básicas
+#!spacy download pt_core_news_md
 nlp = spacy.load("pt_core_news_md")
-
+#
 
 # Configurações básicas torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -67,11 +69,13 @@ class TextDataset(Dataset):
 train_dataset, test_dataset = train_test_split(sequences, test_size=0.2)
 train_dataset = TextDataset(train_dataset)
 
-test_dataset  = TextDataset(test_dataset)  
+test_dataset  = TextDataset(test_dataset)
+
+train_dataset = TextDataset(sequences)
 
 #train_dataset = TextDataset(sequences) #Addiciona todos exemplos ao treinamento
 
-batch_size = 2 # lote de tamanho 1, processamento em paralelo
+batch_size = 1 # lote de tamanho 1, processamento em paralelo
 
 train_data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)# Dataloader para criar mini-lotes de dados	
 test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
@@ -106,7 +110,7 @@ def train_model(model,criterion, train_data_loader,optimizer, num_epochs):
     epoch_loss = []
     for epoch in range(num_epochs):
         for sequence, target in train_data_loader:
-            sequences, targets = sequences.to(device), targets.to(device)
+            sequence, target = sequence.to(device), target.to(device)
             output = model(sequence)
             loss = criterion(output, target)
             optimizer.zero_grad()# Zera os gradientes acumulados
@@ -127,7 +131,7 @@ def evaluate_model(model,test_data_loader):
     with torch.no_grad():# Desativa o cálculo de gradientes durante a avaliação
         total_loss = 0
         for sequence, target in test_data_loader:
-            sequences, targets = sequences.to(device), targets.to(device)
+            sequence, target = sequence.to(device), target.to(device)
             output = model(sequence)
             loss = criterion(output, target)
             total_loss += loss.item()
