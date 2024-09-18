@@ -1,16 +1,22 @@
-
-# Importações
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.document_loaders import DirectoryLoader, TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores.faiss import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings,HuggingFacePipeline
+from langchain.document_loaders import DirectoryLoader, TextLoader, BSHTMLLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter,  HTMLHeaderTextSplitter
 from langchain.chains import RetrievalQA
 from langchain.llms.base import LLM
 from langchain.prompts import PromptTemplate
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 from typing import Optional, List
+import torch
 import os
+from bs4 import BeautifulSoup
+from langchain.llms.base import LLM
+from typing import Optional, List, Any
+from pydantic import BaseModel
+from langchain.chains import RetrievalQA
 
+
+torch_device = "cuda" if torch.cuda.is_available() else "cpu"
 # Preparando os dados
 docs_path = "docs"
 
@@ -20,8 +26,8 @@ if not os.path.exists(docs_path):
         f.write("A inteligência artificial é o campo da ciência da computação que se concentra na criação de máquinas inteligentes que trabalham e reagem como seres humanos.")
     with open(os.path.join(docs_path, "documento2.txt"), "w", encoding="utf-8") as f:
         f.write("O aprendizado de máquina é um subcampo da inteligência artificial que dá às máquinas a habilidade de aprender sem serem explicitamente programadas.")
-
-# Carregando os documentos
+    with open(os.path.join(docs_path, "documento3.txt"), "w", encoding="utf-8") as f:
+        f.write("O aprendizado de máquina é um disciplina ministrada pelo professor Rogério Nogueira de Sousa, o professor tem 42 anos, e trabalha na Universidade Federal do Tocantins.")
 loader = DirectoryLoader(
     docs_path,
     glob="*.txt",
@@ -30,36 +36,53 @@ loader = DirectoryLoader(
 )
 documents = loader.load()
 
+
 # Dividindo os documentos em pedaços menores
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap  = 50)
 texts = text_splitter.split_documents(documents)
 
 # Configurando as embeddings
-embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
-embeddings = HuggingFaceEmbeddings(model_name=embedding_model_name)
+embedding_model_name = "rufimelo/Legal-BERTimbau-large-TSDAE-v4-GPL-sts"
+tokenizer_kwargs = {'clean_up_tokenization_spaces':True}
+model_kwargs = {'device': torch_device,'similarity_fn_name': 'cosine', 'tokenizer_kwargs': tokenizer_kwargs}
+encode_kwargs = {'normalize_embeddings': True}
 
-# Criando o vetor de índice
-vectorstore = FAISS.from_documents(texts, embeddings)
+embeddings = HuggingFaceEmbeddings(model_name=embedding_model_name,
+                                   model_kwargs=model_kwargs, 
+                                   encode_kwargs=encode_kwargs)
+vectorstore = FAISS.from_documents(texts, embeddings)   
 
-# Configurando o modelo de linguagem
 model_name = "pierreguillou/bert-large-cased-squad-v1.1-portuguese"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name, clean_up_tokenization_spaces=True)
 model = AutoModelForQuestionAnswering.from_pretrained(model_name)
 
 qa_pipeline = pipeline(
     "question-answering",
     model=model,
-    tokenizer=tokenizer
+    tokenizer=tokenizer,
+    device=torch_device
 )
 
-# Criando uma classe LLM personalizada
-from langchain.llms.base import LLM
-from typing import Optional, List, Any
-from pydantic import BaseModel
+#testando o pipeline
+# response = qa_pipeline({
+#     'question': "O que é inteligência artificial ?",
+#     'context': "A inteligência artificial é o campo da ciência da computação que se concentra na criação de máquinas inteligentes que trabalham e reagem como seres humanos."
+# }) 
+
+#definindo um limiar
+# threshold = 0.5 # Limiar de similaridade
+# if response['score'] < threshold:
+#     print("Não foi possível encontrar uma resposta.")
+# else:
+#     print("Resposta:", response['answer'])
+#     print("Score:", response['score'])
+
+
+#tipo float
 
 class CustomQALLM(LLM, BaseModel):
     pipeline: Any  # O pipeline do HuggingFace
-
+    threshold: float
     def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
         # O prompt contém o contexto e a pergunta
         # Precisamos extrair ambos
@@ -76,7 +99,9 @@ class CustomQALLM(LLM, BaseModel):
         }
 
         result = self.pipeline(input)
-        print(result['score'])
+        print(f"Score:{result['score']}")
+        if result['score'] < self.threshold:
+            return "Não foi possível encontrar uma resposta."
         return result['answer']
 
     @property
@@ -87,56 +112,23 @@ class CustomQALLM(LLM, BaseModel):
     def _llm_type(self):
         return "custom"
 
-# Criando o LLM personalizado
-custom_llm = CustomQALLM(pipeline=qa_pipeline)
 
-# Definindo o prompt template
+llm = CustomQALLM(pipeline=qa_pipeline, threshold=0.0001)
 prompt_template = """Context: {context}
-
 Question: {question}"""
-
 PROMPT = PromptTemplate(
     template=prompt_template, input_variables=["context", "question"]
 )
 
-# Configurando o chain
-from langchain.chains.question_answering import load_qa_chain
-
-qa_chain = load_qa_chain(
-    llm=custom_llm,
-    chain_type="stuff",
+qa_chain = RetrievalQA.from_llm(
+    llm,
+    retriever=vectorstore.as_retriever(),
     prompt=PROMPT
 )
 
-# Criando o retriever
-retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 2})
+response = qa_chain.invoke("qual o nome do professor?")
+print(response['result'])
+print(f"Pergunta:{response['query']} \nResposta:{response['result']}", "\n", "-"*50)
 
-# Função para responder perguntas
-def answer_question(question):
-    # Recupera documentos relevantes
-    docs = retriever.get_relevant_documents(question)
-    if not docs:
-        return "Informação não disponível nos documentos."
-
-    # Executa o chain com os documentos e a pergunta
-    result = qa_chain.run(
-        input_documents=docs,
-        question=question
-    )
-    return result
-
-# Teste do sistema
-question = "O que é aprendizado de máquina?"
-response = answer_question(question)
-print("Pergunta:")
-print(question)
-print("\nResposta:")
-print(response)
-
-# Pergunta sem resposta nos documentos
-question = "Qual é a capital da França?"
-response = answer_question(question)
-print("\nPergunta:")
-print(question)
-print("\nResposta:")
-print(response)
+response = qa_chain.invoke("O que é aprendizado de máquina?")
+response['result']
